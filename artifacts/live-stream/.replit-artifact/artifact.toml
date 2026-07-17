@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Live Stream App"
+version = "1.0.0"
+id = "artifacts/live-stream"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18356
+
+[services.development]
+run = "pnpm --filter @workspace/live-stream run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/live-stream", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/live-stream/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18356"
+BASE_PATH = "/"
