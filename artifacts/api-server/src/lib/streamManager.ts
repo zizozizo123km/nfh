@@ -67,16 +67,24 @@ function resolveWithYtDlp(pageUrl: string): Promise<string> {
     logger.info("Resolving URL with yt-dlp...");
     execFile(
       ytdlp,
-      ["--no-warnings", "--no-playlist", "-f", "best", "--get-url", pageUrl],
+      [
+        "--no-warnings",
+        "--no-playlist",
+        // prefer a single merged mp4/ts that FFmpeg can read without DASH
+        "-f", "bestvideo[ext=mp4][protocol=https]+bestaudio[ext=m4a][protocol=https]/bestvideo[protocol=https]+bestaudio[protocol=https]/best[protocol=https]/best",
+        "--get-url",
+        pageUrl,
+      ],
       { timeout: 30_000 },
       (err, stdout, stderr) => {
         if (err) {
           return reject(new Error(`فشل yt-dlp: ${stderr?.trim() || err.message}`));
         }
-        const resolved = stdout.trim().split("\n")[0];
-        if (!resolved) return reject(new Error("لم يُعثر على رابط بث من الصفحة."));
-        logger.info("yt-dlp resolved URL successfully");
-        resolve(resolved);
+        // yt-dlp may return two lines (video + audio) for separate streams
+        const lines = stdout.trim().split("\n").filter(Boolean);
+        if (lines.length === 0) return reject(new Error("لم يُعثر على رابط من الصفحة."));
+        logger.info({ lines: lines.length }, "yt-dlp resolved URL successfully");
+        resolve(lines.join("\n")); // pass both lines for ffmpeg multi-input
       },
     );
   });
@@ -145,7 +153,7 @@ function friendlyError(lines: string[], code: number | null, wasLive: boolean): 
     );
   }
   if (/Invalid data found|moov atom not found/i.test(joined)) {
-    return "الرابط المصدر لا يحتوي على بث صالح. تحقق من الرابط وأنه بث مباشر وليس فيديو عادي.";
+    return "تعذّر قراءة الفيديو من المصدر. تأكد من صحة الرابط وأن الفيديو متاح للعرض العام.";
   }
   if (/Connection refused|Connection timed out/i.test(joined)) {
     return "الخادم رفض الاتصال. تحقق من رابط RTMP والمنفذ.";
@@ -305,15 +313,28 @@ export async function startStream(
     }
   }
 
-  launchFfmpeg(
-    [
+  // yt-dlp may return two lines: video URL \n audio URL
+  const urlLines = resolvedUrl.split("\n").filter(Boolean);
+  let inputArgs: string[];
+  if (urlLines.length >= 2) {
+    // Two separate streams (DASH): give each as a separate -i and mix them
+    inputArgs = [
+      "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
+      "-i", urlLines[0],
+      "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
+      "-i", urlLines[1],
+      "-map", "0:v:0", "-map", "1:a:0",
+    ];
+  } else {
+    inputArgs = [
       "-reconnect", "1",
       "-reconnect_streamed", "1",
       "-reconnect_delay_max", "5",
-      "-i", resolvedUrl,
-    ],
-    destinations,
-  );
+      "-i", urlLines[0],
+    ];
+  }
+
+  launchFfmpeg(inputArgs, destinations);
 }
 
 export function stopStream(): void {

@@ -388,12 +388,12 @@ export default function Studio() {
                     dir="ltr"
                     value={sourceUrl}
                     onChange={e => { setSourceUrl(e.target.value); setSourceUrlError(''); }}
-                    placeholder="https://... (m3u8 / YouTube Live / RTMP)"
+                    placeholder="https://youtube.com/watch?v=... أو رابط بث مباشر"
                     className="bg-zinc-950/50 border-zinc-800 text-left font-mono placeholder:text-zinc-600 focus-visible:ring-zinc-600 focus-visible:border-zinc-500"
                   />
                   {sourceUrlError && <p className="text-red-400 text-sm">{sourceUrlError}</p>}
                   <p className="text-zinc-600 text-xs leading-relaxed">
-                    يدعم: يوتيوب لايف، m3u8، RTMP، Twitch. روابط يوتيوب تُحَل تلقائياً.
+                    يدعم: يوتيوب (فيديو عادي أو بث مباشر)، Twitch، m3u8، RTMP — روابط يوتيوب تُحَل تلقائياً عبر yt-dlp.
                   </p>
                 </div>
               )}
